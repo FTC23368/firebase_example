@@ -25,4 +25,3 @@ else:
             if st.button(f"Show text for {file['file_name']}"):
                 text = get_text_content(file["file_name"])
                 st.text_area("File Text", text, height=200)
-
