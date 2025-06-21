@@ -23,7 +23,7 @@ def init_firestore():
                 raise RuntimeError(
                     "project_id or storage_bucket must be provided in st.secrets"
                 )
-            bucket_name = project_id + ".appspot.com"
+            bucket_name = project_id + ".firebasestorage.app"
 
         firebase_admin.initialize_app(cred, {"storageBucket": bucket_name})
     return firestore.client()
