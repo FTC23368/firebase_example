@@ -14,9 +14,18 @@ def init_firestore():
         if cred_info is None:
             raise RuntimeError("Firebase credentials not found in st.secrets")
         cred = credentials.Certificate(dict(cred_info))
-        firebase_admin.initialize_app(
-            cred, {"storageBucket": cred_info.get("project_id") + ".appspot.com"}
-        )
+
+        # allow overriding the bucket used for uploads
+        bucket_name = cred_info.get("storage_bucket")
+        if not bucket_name:
+            project_id = cred_info.get("project_id")
+            if not project_id:
+                raise RuntimeError(
+                    "project_id or storage_bucket must be provided in st.secrets"
+                )
+            bucket_name = project_id + ".appspot.com"
+
+        firebase_admin.initialize_app(cred, {"storageBucket": bucket_name})
     return firestore.client()
 
 
