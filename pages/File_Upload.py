@@ -14,7 +14,6 @@ if uploaded is not None:
     if st.button("Upload to Firebase"):
         try:
             upload_file(file_bytes, filename, file_type)
-            st.success(f"Uploaded {filename} to Firestore")
+            st.success(f"Uploaded {filename} to Firebase Storage")
         except Exception as e:
             st.error(f"Failed to upload: {e}")
-

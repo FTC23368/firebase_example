@@ -1,9 +1,8 @@
-import base64
 from datetime import datetime
 from io import BytesIO
 
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, storage
 import streamlit as st
 from PyPDF2 import PdfReader
 
@@ -15,8 +14,16 @@ def init_firestore():
         if cred_info is None:
             raise RuntimeError("Firebase credentials not found in st.secrets")
         cred = credentials.Certificate(dict(cred_info))
-        firebase_admin.initialize_app(cred)
+        firebase_admin.initialize_app(
+            cred, {"storageBucket": cred_info.get("project_id") + ".appspot.com"}
+        )
     return firestore.client()
+
+
+def get_bucket():
+    """Return the default Firebase Storage bucket."""
+    init_firestore()  # ensure app initialized
+    return storage.bucket()
 
 
 def extract_text(file_bytes: bytes, file_type: str) -> str:
@@ -30,32 +37,36 @@ def extract_text(file_bytes: bytes, file_type: str) -> str:
 
 
 def upload_file(file_bytes: bytes, filename: str, file_type: str):
-    """Upload the file to Firestore and store metadata."""
+    """Upload the file to Firebase Storage and store metadata only."""
     db = init_firestore()
+    bucket = get_bucket()
     uploaded_at = datetime.utcnow()
     content_text = extract_text(file_bytes, file_type)
 
-    encoded = base64.b64encode(file_bytes).decode("utf-8")
+    # paths in storage
+    file_path = f"files/{filename}"
+    content_path = f"file_contents/{filename}.content"
 
-    # metadata record
+    # upload the original file
+    blob = bucket.blob(file_path)
+    blob.upload_from_string(file_bytes, content_type=file_type)
+
+    # upload extracted text as separate file
+    text_blob = bucket.blob(content_path)
+    text_blob.upload_from_string(content_text, content_type="text/plain")
+
+    # metadata record with references to storage paths
     doc_ref = db.collection("files").document(filename)
-    doc_ref.set({
-        "file_name": filename,
-        "file_size": len(file_bytes),
-        "file_type": file_type,
-        "uploaded_at": uploaded_at,
-        "content_file": f"{filename}.content"
-    })
-
-    # store binary content
-    doc_ref.collection("data").document("binary").set({"content": encoded})
-
-    # second file with plain text
-    db.collection("file_contents").document(f"{filename}.content").set({
-        "text": content_text,
-        "source_file": filename,
-        "uploaded_at": uploaded_at
-    })
+    doc_ref.set(
+        {
+            "file_name": filename,
+            "file_size": len(file_bytes),
+            "file_type": file_type,
+            "uploaded_at": uploaded_at,
+            "storage_path": file_path,
+            "content_path": content_path,
+        }
+    )
 
 
 def list_files():
@@ -66,20 +77,28 @@ def list_files():
 
 
 def get_file_content(filename: str) -> bytes:
-    """Retrieve binary content for the given filename."""
+    """Retrieve binary content for the given filename from Storage."""
     db = init_firestore()
-    doc = db.collection("files").document(filename).collection("data").document("binary").get()
-    if doc.exists:
-        encoded = doc.to_dict().get("content", "")
-        return base64.b64decode(encoded)
+    bucket = get_bucket()
+    meta = db.collection("files").document(filename).get()
+    if meta.exists:
+        storage_path = meta.to_dict().get("storage_path", f"files/{filename}")
+        blob = bucket.blob(storage_path)
+        if blob.exists():
+            return blob.download_as_bytes()
     return b""
 
 
 def get_text_content(filename: str) -> str:
-    """Retrieve text from the .content document."""
+    """Retrieve text content file from Storage."""
     db = init_firestore()
-    doc = db.collection("file_contents").document(f"{filename}.content").get()
-    if doc.exists:
-        return doc.to_dict().get("text", "")
+    bucket = get_bucket()
+    meta = db.collection("files").document(filename).get()
+    if meta.exists:
+        content_path = meta.to_dict().get(
+            "content_path", f"file_contents/{filename}.content"
+        )
+        blob = bucket.blob(content_path)
+        if blob.exists():
+            return blob.download_as_text()
     return ""
-

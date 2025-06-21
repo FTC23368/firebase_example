@@ -1,6 +1,6 @@
 # Streamlit Firebase Example
 
-This repository contains a simple Streamlit application with multiple pages. The app demonstrates how to upload PDF or text files to Firebase Firestore and view the uploaded files.
+This repository contains a simple Streamlit application with multiple pages. The app demonstrates how to upload PDF or text files to Firebase Storage and view the uploaded files. Metadata about each upload is stored in Firestore.
 
 ## Requirements
 
