@@ -45,7 +45,7 @@ def extract_text(file_bytes: bytes, file_type: str) -> str:
     return file_bytes.decode("utf-8", errors="ignore")
 
 
-def upload_file(file_bytes: bytes, filename: str, file_type: str):
+def upload_file(file_bytes: bytes, filename: str, file_type: str, doc_category: list, doc_name: str):
     """Upload the file to Firebase Storage and store metadata only."""
     db = init_firestore()
     bucket = get_bucket()
@@ -74,6 +74,8 @@ def upload_file(file_bytes: bytes, filename: str, file_type: str):
             "uploaded_at": uploaded_at,
             "storage_path": file_path,
             "content_path": content_path,
+            "doc_category": doc_category,
+            "doc_name": doc_name,
         }
     )
 
